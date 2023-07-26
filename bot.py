@@ -40,7 +40,35 @@ def build_button(label):
 async def play(interaction, link : str):
     view = SimpleView()
     await interaction.response.send_message(view=view, content="**Here's what I found**")
-    
+
+@tree.command(name = "pause", description = "Pause music that is playing", guild = discord.Object(id=536041241972834304))
+# Pause the audio if audio is playing
+async def pause(send_message=True):
+    try:
+        if voice.is_paused(): # Audio is already paused
+            await message.channel.send("You cannot pause music that is already paused!")
+        else:
+            voice.pause()
+            voice.is_paused()
+            if send_message:
+                await message.channel.send("Pausing your music due to your request!")
+    except Exception as e:
+        print(e)
+
+@tree.command(name = "resume", description = "Resume music that is paused", guild = discord.Object(id=536041241972834304))
+# Resume paused auido
+async def resume(send_message=True):
+    try:
+        if voice.is_playing(): # Audio is already playing
+            await message.channel.send("You cannot resume music that is already playing!")
+        else: 
+            voice.resume()
+            voice.is_playing()
+            if send_message:
+                await message.channel.send("Resuming your music that you wanted paused so badly!")
+    except Exception as e:
+        print(e)
+        
 async def send_message(message, user_message, is_private):
     try:
         response = responses.handle_response(user_message)
@@ -117,31 +145,6 @@ async def play_audio(user_message, message, send_message=True):
         voice.is_playing()
         if send_message:
             await message.channel.send(responses.get_random_quip())
-    except Exception as e:
-        print(e)
-
-#Pause the audio if audio is playing
-async def pause_audio(send_message=True):
-    try:
-        if voice.is_paused(): #audio is already paused
-            await message.channel.send("You cannot pause music that is already paused!")
-        else:
-            voice.pause()
-            voice.is_paused()
-            if send_message:
-                await message.channel.send("Pausing your music due to your request!")
-    except Exception as e:
-        print(e)
-
-async def resume_audio(send_message=True):
-    try:
-        if voice.is_playing():
-            await message.channel.send("You cannot resume music that is already playing!")
-        else:
-            voice.resume()
-            voice.is_playing()
-            if send_message:
-                await message.channel.send("Resuming your music that you wanted paused so badly!")
     except Exception as e:
         print(e)
 
