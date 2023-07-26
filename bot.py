@@ -40,9 +40,7 @@ def build_button(label):
 async def play(interaction, link : str):
     view = SimpleView()
     await interaction.response.send_message(view=view, content="**Here's what I found**")
-
-
-
+    
 async def send_message(message, user_message, is_private):
     try:
         response = responses.handle_response(user_message)
@@ -122,6 +120,31 @@ async def play_audio(user_message, message, send_message=True):
     except Exception as e:
         print(e)
 
+#Pause the audio if audio is playing
+async def pause_audio(send_message=True):
+    try:
+        if voice.is_paused(): #audio is already paused
+            await message.channel.send("You cannot pause music that is already paused!")
+        else:
+            voice.pause()
+            voice.is_paused()
+            if send_message:
+                await message.channel.send("Pausing your music due to your request!")
+    except Exception as e:
+        print(e)
+
+async def resume_audio(send_message=True):
+    try:
+        if voice.is_playing():
+            await message.channel.send("You cannot resume music that is already playing!")
+        else:
+            voice.resume()
+            voice.is_playing()
+            if send_message:
+                await message.channel.send("Resuming your music that you wanted paused so badly!")
+    except Exception as e:
+        print(e)
+
 def run_discord_bot():
 
     @client.event
@@ -149,6 +172,10 @@ def run_discord_bot():
         #play youtube audio in voice channel
         if user_message.startswith('+play'):
             await play_audio(message, user_message[6:])
+        elif user_message.startswith('+pause'):
+            await pause_audio()
+        elif user_message.startswith('+resume'):
+            await resume_audio()
         
 
     # Remember to run your bot with your personal TOKEN
