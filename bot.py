@@ -57,35 +57,30 @@ async def play(interaction, link : str):
     await play_audio(link,interaction)
     await interaction.followup.send(responses.get_random_quip())
 
-
+# Pause audio that is playing
+# TODO: Find way to determine if audio is still being played. If song is over, don't want to allow user to pause a finished song
 @tree.command(name = "pause", description = "Pause music that is playing", guild = discord.Object(id=536041241972834304))
-# Pause the audio if audio is playing
-async def pause(send_message=True):
-    try:
-        if voice.is_paused(): # Audio is already paused
-            await message.channel.send("You cannot pause music that is already paused!")
-        else:
-            voice.pause()
-            voice.is_paused()
-            if send_message:
-                await message.channel.send("Pausing your music due to your request!")
-    except Exception as e:
-        print(e)
+async def pause(interaction):
+    await interaction.response.defer(ephemeral=False)
+    voice = discord.utils.get(client.voice_clients, guild=interaction.guild)
+    if voice.is_paused(): # Audio is playing, can be paused
+        await interaction.followup.send("You cannot pause music that is already paused!")
+    else:
+        await pause_audio(interaction)
+        await interaction.followup.send(f"Music paused by {interaction.user.mention}")
 
+# Resume audio that is paused
+# TODO: Find way to determine if audio is still being played. If song is over, don't want to allow user to resume a finished song
 @tree.command(name = "resume", description = "Resume music that is paused", guild = discord.Object(id=536041241972834304))
-# Resume paused audio
-async def resume(send_message=True):
-    try:
-        if voice.is_playing(): # Audio is already playing
-            await message.channel.send("You cannot resume music that is already playing!")
-        else: 
-            voice.resume()
-            voice.is_playing()
-            if send_message:
-                await message.channel.send("Resuming your music that you wanted paused so badly!")
-    except Exception as e:
-        print(e)
-        
+async def resume(interaction):
+    await interaction.response.defer(ephemeral=False)
+    voice = discord.utils.get(client.voice_clients, guild=interaction.guild)
+    if voice.is_playing():
+        await interaction.followup.send("You cannot resume music that is already playing!")
+    else:
+        await resume_audio(interaction)
+        await interaction.followup.send(f"Music resumed by {interaction.user.mention}")
+
 async def send_message(message, user_message, is_private):
     try:
         response = responses.handle_response(user_message)
@@ -159,6 +154,7 @@ async def play_audio(user_message, message):
         if voice == None:
             await channel.connect()
             voice = discord.utils.get(client.voice_clients, guild=message.guild)
+        #source = discord.FFmpegPCMAudio(executable="ffmpeg.exe", source="audio.mp3")
         source = discord.FFmpegPCMAudio(executable="C:/PATH_Programs/ffmpeg.exe", source="audio.mp3")
         voice.play(source)
         voice.is_playing()
@@ -166,7 +162,23 @@ async def play_audio(user_message, message):
     except Exception as e:
         print(e)
 
+# Pause audio if playing
+async def pause_audio(message):
+    voice = discord.utils.get(client.voice_clients, guild=message.guild)
+    try:
+        voice.pause()
+        voice.is_paused() # Audio is paused
+    except Exception as e:
+        print(e)
 
+# Resume audio if paused
+async def resume_audio(message):
+    voice = discord.utils.get(client.voice_clients, guild=message.guild)
+    try:
+        voice.resume() 
+        voice.is_playing() # Audio is playing again
+    except Exception as e:
+        print(e)
 
 def run_discord_bot():
 
