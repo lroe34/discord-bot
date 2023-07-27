@@ -7,9 +7,7 @@ from search import youtube_search
 from yt_dlp import YoutubeDL
 import argparse
 from googleapiclient.discovery import build
-from googleapiclient.errors import HttpError
 import os
-import random
 from bs4 import BeautifulSoup
 
 intents = discord.Intents.default()
@@ -20,13 +18,24 @@ TOKEN = 'MTEzMTU1OTU3OTQ5NTQ0ODU5Ng.GRrkOF.9XxYeknyj7SVcsQqX2AD2k-5CAIFewCzsZ9a6
 
 client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
-bot = commands.Bot(command_prefix='+', intents=intents)
+
 
 
 class SimpleView(discord.ui.View):
     @discord.ui.button(label="testtesttesttesttesttesttesttesttesttesttesttesttesttesttest", style=discord.ButtonStyle.secondary, custom_id="test")
     async def hello(self, interaction: discord.Interaction, button: discord.ui.Button, interaction_type: discord.InteractionType):
         await interaction.response.send_message("Hello!", ephemeral=True)
+
+class SearchItem(discord.ui.Button):
+    def __init__(self, label, custom_id, style=discord.ButtonStyle.blurple, **kwargs):
+        super().__init__(label=label, custom_id=custom_id, style=style, **kwargs)
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=False)
+        await play_audio(f'https://www.youtube.com/watch?v={self.custom_id}',interaction)
+        await interaction.edit_original_response(view=None, content=f"Played {self.label}")
+        
+
 
 def build_button(label):
     label = label.split(' (')
@@ -39,12 +48,12 @@ def build_button(label):
     # use beatiful soup to turn the unicode html into normal unicode
     soup = BeautifulSoup(label, 'html.parser')
     label = soup.get_text()
-    return discord.ui.Button(label=label, style=discord.ButtonStyle.secondary, custom_id=id)
+    return SearchItem(label=label, custom_id=id)
 
 #plays a song from youtube link
 @tree.command(name = "play", description = "Play music from youtube link", guild=discord.Object(id=536041241972834304)) 
 async def play(interaction, link : str):
-    await interaction.response.defer(ephemeral=True)
+    await interaction.response.defer(ephemeral=False)
     await play_audio(link,interaction)
     await interaction.followup.send(responses.get_random_quip())
 
@@ -105,11 +114,8 @@ async def search(interaction, search : str):
     for video in videos:
         view.add_item(build_button(video))
     await interaction.response.send_message(view=view, content='**Here\'s what I found**')
-    # play music from selected button
-    interaction,button = await bot.wait_for("button_click", timeout=60)
-    await interaction.send(content = "Button clicked!" + button.label)
 
-    
+
 
    
 @tree.command(name = 'pick', description = "Pick video from search list", guild=discord.Object(id=536041241972834304))
@@ -118,13 +124,14 @@ async def pick(interaction, pick : str):
 
 @tree.command(name = 'disconnect', description = "Kick V.H.O.S from their current channel", guild=discord.Object(id=536041241972834304))
 async def disconnect(interaction):
+            await interaction.response.defer(ephemeral=False)
             voice = discord.utils.get(client.voice_clients, guild=interaction.guild)
             if voice.is_connected():
                 await voice.disconnect()
+                await interaction.followup.send(f"Disconnected by {interaction.user.mention}")
             else:
-                await interaction.channel.send("Dumb human, I'm not in a voice channel! (But I'll let you off the hook this time)")
-
-
+                await interaction.followup.send("Dumb human, I'm not in a voice channel! (But I'll let you off the hook this time)")
+            
 
 # asnyc function to have the bot join voice channel and play audio from youtube
 async def play_audio(user_message, message):
@@ -159,6 +166,8 @@ async def play_audio(user_message, message):
     except Exception as e:
         print(e)
 
+
+
 def run_discord_bot():
 
     @client.event
@@ -184,7 +193,12 @@ def run_discord_bot():
         print(f"{username} said: '{user_message}' ({channel})")
         await send_message(message, user_message, is_private=False)
 
-
-    # Remember to run your bot with your personal TOKEN
+    #play song from selected button 
+    @client.event
+    async def on_button_click(interaction):
+        await interaction.response.defer(ephemeral=False)
+        await play_audio(f'https://www.youtube.com/watch?v={interaction.component.custom_id}',interaction)
+        await interaction.followup.send(responses.get_random_quip())
+    
 
     client.run(TOKEN)

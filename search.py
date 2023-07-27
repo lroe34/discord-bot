@@ -56,7 +56,7 @@ def youtube_search(options):
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
   parser.add_argument('--q', help='Search term', default='dark side of the moon')
-  parser.add_argument('--max-results', help='Max results', default=10)
+  parser.add_argument('--max-results', help='Max results', default=5)
   args = parser.parse_args()
 
   try:
