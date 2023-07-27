@@ -56,7 +56,7 @@ async def pause(send_message=True):
         print(e)
 
 @tree.command(name = "resume", description = "Resume music that is paused", guild = discord.Object(id=536041241972834304))
-# Resume paused auido
+# Resume paused audio
 async def resume(send_message=True):
     try:
         if voice.is_playing(): # Audio is already playing
