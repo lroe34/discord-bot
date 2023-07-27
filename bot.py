@@ -9,6 +9,8 @@ import argparse
 from googleapiclient.discovery import build
 import os
 from bs4 import BeautifulSoup
+#import package to make script wait
+import asyncio
 
 intents = discord.Intents.default()
 intents.typing = False
@@ -90,10 +92,12 @@ async def send_message(message, user_message, is_private):
 
 @tree.command(name = "viking_funeral", description = "Send a member a proper fairwell", guild=discord.Object(id=536041241972834304)) 
 async def vikingFuneral(interaction, member : discord.Member):
-    await interaction.response.send_message("Fairwell " + member.mention + ". You will be missed.")
-    await play_audio(member,"https://www.youtube.com/watch?v=ofm0FXIAq1U")
-    
-    #await member.kick()
+    await interaction.response.defer(ephemeral=False)
+    await interaction.followup.send("Fairwell " + member.mention + ". You will be missed.")
+    await play_audio("https://www.youtube.com/watch?v=ofm0FXIAq1U", interaction)
+    #wait for song to finish
+    await asyncio.sleep(156)
+    await member.kick()
 
 
 @tree.command(name = "search", description = "Search for a song on YouTube", guild=discord.Object(id=536041241972834304)) 
