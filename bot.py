@@ -10,6 +10,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 import os
 import random
+from bs4 import BeautifulSoup
 
 intents = discord.Intents.default()
 intents.typing = False
@@ -30,16 +31,23 @@ class SimpleView(discord.ui.View):
 def build_button(label):
     label = label.split(' (')
     id = label[-1]
-    label = label[:-2]
-    
-    label = ''.join(label)
+    id = id[0:-1]
+    label = label[0:-1]
+    label = ' '.join(label)
+    if len(label) > 80:
+        label = label[0:70] + '...'
+    # use beatiful soup to turn the unicode html into normal unicode
+    soup = BeautifulSoup(label, 'html.parser')
+    label = soup.get_text()
     return discord.ui.Button(label=label, style=discord.ButtonStyle.secondary, custom_id=id)
 
-
+#plays a song from youtube link
 @tree.command(name = "play", description = "Play music from youtube link", guild=discord.Object(id=536041241972834304)) 
 async def play(interaction, link : str):
-    view = SimpleView()
-    await interaction.response.send_message(view=view, content="**Here's what I found**")
+    await interaction.response.defer(ephemeral=True)
+    await play_audio(link,interaction)
+    await interaction.followup.send(responses.get_random_quip())
+
 
 @tree.command(name = "pause", description = "Pause music that is playing", guild = discord.Object(id=536041241972834304))
 # Pause the audio if audio is playing
@@ -96,7 +104,13 @@ async def search(interaction, search : str):
     view = discord.ui.View()
     for video in videos:
         view.add_item(build_button(video))
-    await interaction.response.send_message(view=view, content='\n'.join(videos))
+    await interaction.response.send_message(view=view, content='**Here\'s what I found**')
+    # play music from selected button
+    interaction,button = await bot.wait_for("button_click", timeout=60)
+    await interaction.send(content = "Button clicked!" + button.label)
+
+    
+
    
 @tree.command(name = 'pick', description = "Pick video from search list", guild=discord.Object(id=536041241972834304))
 async def pick(interaction, pick : str):
@@ -113,7 +127,7 @@ async def disconnect(interaction):
 
 
 # asnyc function to have the bot join voice channel and play audio from youtube
-async def play_audio(user_message, message, send_message=True):
+async def play_audio(user_message, message):
     try:
         try:
             os.remove("audio.mp3")
@@ -126,15 +140,13 @@ async def play_audio(user_message, message, send_message=True):
         ydl = YoutubeDL(ydl_opts)
         info = ydl.extract_info(user_message, download=True, process=True, ie_key='Youtube')
         URL = info['formats'][0]['url']
-        print(URL)
         
     # check if input link is for a playlist or a single video
         #if '&list=' in user_message:
 
-
         voice = discord.utils.get(client.voice_clients, guild=message.guild)
         try:
-            channel = message.author.voice.channel
+            channel = message.user.voice.channel            
         except:
             return await message.channel.send("You're not in a voice channel, dumbass!")
         if voice == None:
@@ -143,8 +155,7 @@ async def play_audio(user_message, message, send_message=True):
         source = discord.FFmpegPCMAudio(executable="C:/PATH_Programs/ffmpeg.exe", source="audio.mp3")
         voice.play(source)
         voice.is_playing()
-        if send_message:
-            await message.channel.send(responses.get_random_quip())
+            
     except Exception as e:
         print(e)
 
@@ -172,14 +183,7 @@ def run_discord_bot():
         # Debug printing
         print(f"{username} said: '{user_message}' ({channel})")
         await send_message(message, user_message, is_private=False)
-        #play youtube audio in voice channel
-        if user_message.startswith('+play'):
-            await play_audio(message, user_message[6:])
-        elif user_message.startswith('+pause'):
-            await pause_audio()
-        elif user_message.startswith('+resume'):
-            await resume_audio()
-        
+
 
     # Remember to run your bot with your personal TOKEN
 
