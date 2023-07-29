@@ -21,8 +21,6 @@ TOKEN = 'MTEzMTU1OTU3OTQ5NTQ0ODU5Ng.GRrkOF.9XxYeknyj7SVcsQqX2AD2k-5CAIFewCzsZ9a6
 client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
 
-
-
 class SimpleView(discord.ui.View):
     @discord.ui.button(label="testtesttesttesttesttesttesttesttesttesttesttesttesttesttest", style=discord.ButtonStyle.secondary, custom_id="test")
     async def hello(self, interaction: discord.Interaction, button: discord.ui.Button, interaction_type: discord.InteractionType):
@@ -82,6 +80,15 @@ async def resume(interaction):
     else:
         await resume_audio(interaction)
         await interaction.followup.send(f"Music resumed by {interaction.user.mention}")
+
+# Skip a song
+# TODO: Find way to determine if audio is playing. If no song, dont want user to skip
+@tree.command(name = "skip", description = "Skip a song", guild = discord.Object(id=536041241972834304))
+async def skip(interaction):
+    await interaction.response.defer(ephemeral=False)
+    voice = discord.utils.get(client.voice_clients, guild=interaction.guild)
+    voice.stop()
+    await interaction.followup.send(f"Song skipped by {interaction.user.mention}")
 
 async def send_message(message, user_message, is_private):
     try:
@@ -158,9 +165,8 @@ async def play_audio(user_message, message):
         if voice == None:
             await channel.connect()
             voice = discord.utils.get(client.voice_clients, guild=message.guild)
-        #source = discord.FFmpegPCMAudio(executable="ffmpeg.exe", source="audio.mp3")
         source = discord.FFmpegPCMAudio(executable="C:/PATH_Programs/ffmpeg.exe", source="audio.mp3")
-        voice.play(source)
+        voice.play(source, after=audioDone)
         voice.is_playing()
             
     except Exception as e:
@@ -181,6 +187,15 @@ async def resume_audio(message):
     try:
         voice.resume() 
         voice.is_playing() # Audio is playing again
+    except Exception as e:
+        print(e)
+
+# Used in play(after=) to determine when audio is finished
+def audioDone(error):
+    try:
+        coro = print("Audio is finished!")
+        threadSafe = asyncio.run_coroutine_threadsafe(coro, client.loop)
+        threadSafe.result()
     except Exception as e:
         print(e)
 
