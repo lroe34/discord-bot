@@ -21,6 +21,7 @@ TOKEN = 'MTEzMTU1OTU3OTQ5NTQ0ODU5Ng.GRrkOF.9XxYeknyj7SVcsQqX2AD2k-5CAIFewCzsZ9a6
 client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
 
+queuePlaylist = []
 class SimpleView(discord.ui.View):
     @discord.ui.button(label="testtesttesttesttesttesttesttesttesttesttesttesttesttesttest", style=discord.ButtonStyle.secondary, custom_id="test")
     async def hello(self, interaction: discord.Interaction, button: discord.ui.Button, interaction_type: discord.InteractionType):
@@ -53,9 +54,16 @@ def build_button(label):
 #plays a song from youtube link
 @tree.command(name = "play", description = "Play music from youtube link", guild=discord.Object(id=536041241972834304)) 
 async def play(interaction, link : str):
-    await interaction.response.defer(ephemeral=False)
-    await play_audio(link,interaction)
-    await interaction.followup.send(responses.get_random_quip())
+    if len(queuePlaylist) == 0: # First song in the queue
+        await interaction.response.defer(ephemeral=False)
+        await play_audio(link,interaction)
+        queuePlaylist.append(link)
+        print("First song: ", queuePlaylist)
+        await interaction.followup.send(responses.get_random_quip())
+    else: # There is a song already playing/in queue
+        await interaction.response.defer(ephemeral=False)
+        queuePlaylist.append(link)
+        await interaction.followup.send("Added song to queue!")
 
 # Pause audio that is playing
 # TODO: Find way to determine if audio is still being played. If song is over, don't want to allow user to pause a finished song
@@ -87,8 +95,19 @@ async def resume(interaction):
 async def skip(interaction):
     await interaction.response.defer(ephemeral=False)
     voice = discord.utils.get(client.voice_clients, guild=interaction.guild)
+    source = discord.FFmpegPCMAudio(executable="C:/PATH_Programs/ffmpeg.exe", source="audio.mp3")
     voice.stop()
     await interaction.followup.send(f"Song skipped by {interaction.user.mention}")
+    source.cleanup()
+
+# Show the queue
+# TODO: Have this command work
+@tree.command(name = "queue", description = "Shows the current song queue", guild = discord.Object(id=536041241972834304))
+async def queue(interaction):
+    await interaction.response.defer(ephemeral=False)
+    for i in queuePlaylist:
+        print(i, ": ", queuePlaylist[i])
+        await interaction.followup.send(i, ": ", queuePlaylist[i])
 
 async def send_message(message, user_message, is_private):
     try:
@@ -121,8 +140,6 @@ async def search(interaction, search : str):
         view.add_item(build_button(video))
     await interaction.response.send_message(view=view, content='**Here\'s what I found**')
 
-
-
    
 @tree.command(name = 'pick', description = "Pick video from search list", guild=discord.Object(id=536041241972834304))
 async def pick(interaction, pick : str):
@@ -153,7 +170,7 @@ async def play_audio(user_message, message):
         ydl = YoutubeDL(ydl_opts)
         info = ydl.extract_info(user_message, download=True, process=True, ie_key='Youtube')
         URL = info['formats'][0]['url']
-        
+
     # check if input link is for a playlist or a single video
         #if '&list=' in user_message:
 
@@ -190,12 +207,36 @@ async def resume_audio(message):
     except Exception as e:
         print(e)
 
+def playNext(user_message):
+    try:
+        try:
+            os.remove("audio.mp3")
+        except:
+            pass
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'outtmpl': 'audio.mp3',
+        }
+        ydl = YoutubeDL(ydl_opts)
+        info = ydl.extract_info(user_message, download=True, process=True, ie_key='Youtube')
+        URL = info['formats'][0]['url']
+
+    # check if input link is for a playlist or a single video
+        #if '&list=' in user_message:
+        voice = discord.utils.get(client.voice_clients)
+        source = discord.FFmpegPCMAudio(executable="C:/PATH_Programs/ffmpeg.exe", source="audio.mp3")
+        voice.play(source, after=audioDone)
+        voice.is_playing()
+    except Exception as e:
+        print(e)
+
 # Used in play(after=) to determine when audio is finished
 def audioDone(error):
     try:
-        coro = print("Audio is finished!")
-        threadSafe = asyncio.run_coroutine_threadsafe(coro, client.loop)
-        threadSafe.result()
+        print("Queue before pop:", queuePlaylist)
+        queuePlaylist.pop(0) # Remove 0th item from list
+        print("Queue after pop:", queuePlaylist)
+        playNext(queuePlaylist[0])
     except Exception as e:
         print(e)
 
