@@ -22,6 +22,7 @@ client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
 
 queuePlaylist = []
+sourcePlaylist = []
 class SimpleView(discord.ui.View):
     @discord.ui.button(label="testtesttesttesttesttesttesttesttesttesttesttesttesttesttest", style=discord.ButtonStyle.secondary, custom_id="test")
     async def hello(self, interaction: discord.Interaction, button: discord.ui.Button, interaction_type: discord.InteractionType):
@@ -58,7 +59,6 @@ async def play(interaction, link : str):
         await interaction.response.defer(ephemeral=False)
         await play_audio(link,interaction)
         queuePlaylist.append(link)
-        print("First song: ", queuePlaylist)
         await interaction.followup.send(responses.get_random_quip())
     else: # There is a song already playing/in queue
         await interaction.response.defer(ephemeral=False)
@@ -91,14 +91,12 @@ async def resume(interaction):
 
 # Skip a song
 # TODO: Find way to determine if audio is playing. If no song, dont want user to skip
-@tree.command(name = "skip", description = "Skip a song", guild = discord.Object(id=536041241972834304))
+@tree.command(name = "skip", description = "Skip the current song", guild = discord.Object(id=536041241972834304))
 async def skip(interaction):
     await interaction.response.defer(ephemeral=False)
     voice = discord.utils.get(client.voice_clients, guild=interaction.guild)
-    source = discord.FFmpegPCMAudio(executable="C:/PATH_Programs/ffmpeg.exe", source="audio.mp3")
-    voice.stop()
     await interaction.followup.send(f"Song skipped by {interaction.user.mention}")
-    source.cleanup()
+    voice.stop()
 
 # Show the queue
 # TODO: Have this command work
@@ -106,8 +104,14 @@ async def skip(interaction):
 async def queue(interaction):
     await interaction.response.defer(ephemeral=False)
     for i in queuePlaylist:
-        print(i, ": ", queuePlaylist[i])
-        await interaction.followup.send(i, ": ", queuePlaylist[i])
+        await interaction.followup.send(f"{str(i+1)}: {queuePlaylist[i]}")
+
+@tree.command(name = "clear", description = "Clears the current queue", guild = discord.Object(id=536041241972834304))
+async def clear(interaction):
+    await interaction.response.defer(ephemeral=False)
+    queuePlaylist.clear()
+    sourcePlaylist.clear()
+    await interaction.followup.send(f"Queue was cleared by {interaction.user.mention}")
 
 async def send_message(message, user_message, is_private):
     try:
@@ -176,16 +180,16 @@ async def play_audio(user_message, message):
 
         voice = discord.utils.get(client.voice_clients, guild=message.guild)
         try:
-            channel = message.user.voice.channel            
+            channel = message.user.voice.channel
         except:
             return await message.channel.send("You're not in a voice channel, dumbass!")
         if voice == None:
             await channel.connect()
             voice = discord.utils.get(client.voice_clients, guild=message.guild)
         source = discord.FFmpegPCMAudio(executable="C:/PATH_Programs/ffmpeg.exe", source="audio.mp3")
+        sourcePlaylist.append(source)
         voice.play(source, after=audioDone)
         voice.is_playing()
-            
     except Exception as e:
         print(e)
 
@@ -225,6 +229,7 @@ def playNext(user_message):
         #if '&list=' in user_message:
         voice = discord.utils.get(client.voice_clients)
         source = discord.FFmpegPCMAudio(executable="C:/PATH_Programs/ffmpeg.exe", source="audio.mp3")
+        sourcePlaylist.append(source)
         voice.play(source, after=audioDone)
         voice.is_playing()
     except Exception as e:
@@ -233,9 +238,9 @@ def playNext(user_message):
 # Used in play(after=) to determine when audio is finished
 def audioDone(error):
     try:
-        print("Queue before pop:", queuePlaylist)
-        queuePlaylist.pop(0) # Remove 0th item from list
-        print("Queue after pop:", queuePlaylist)
+        sourcePlaylist[0].cleanup()
+        sourcePlaylist.pop(0) # Remove 0th item from sourcePlaylist
+        queuePlaylist.pop(0) # Remove 0th item from queuePlaylist
         playNext(queuePlaylist[0])
     except Exception as e:
         print(e)
