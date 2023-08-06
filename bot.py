@@ -156,6 +156,8 @@ async def disconnect(interaction):
             if voice.is_connected():
                 await voice.disconnect()
                 await interaction.followup.send(f"Disconnected by {interaction.user.mention}")
+                queuePlaylist.clear()
+                sourcePlaylist.clear()
             else:
                 await interaction.followup.send("Dumb human, I'm not in a voice channel! (But I'll let you off the hook this time)")
             
