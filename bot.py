@@ -99,18 +99,36 @@ async def skip(interaction):
     voice.stop()
 
 # Show the queue
-# TODO: Have this command work
+# TODO: Print out the name of the songs instead of the links
 @tree.command(name = "queue", description = "Shows the current song queue", guild = discord.Object(id=536041241972834304))
 async def queue(interaction):
     await interaction.response.defer(ephemeral=False)
-    for i in queuePlaylist:
-        await interaction.followup.send(f"{str(i+1)}: {queuePlaylist[i]}")
+    if (len(queuePlaylist) == 0): # No songs in queue
+        await interaction.followup.send("Queue is empty!")
+    else: # Songs in queue
+        await interaction.followup.send("Current queue:")
+        view = ""
+        queuePos = 1
+        for i in queuePlaylist:
+            view += str(queuePos) + ": " + i + "\n"
+            queuePos += 1
+        await interaction.followup.send(view)
+
+# Show the current song that is playing
+# TODO: Print out name of song as well instead of just link. Print current song after a /clear call
+@tree.command(name = "current", description = "Shows the current song playing", guild = discord.Object(id=536041241972834304))
+async def current(interaction):
+    await interaction.response.defer(ephemeral=False)
+    if (len(queuePlaylist == 0)):
+        await interaction.followup.send(f"There is no song playing!")
+    else:
+        await interaction.followup.send(f"Current song that is playing: {queuePlaylist[0]}")
+
 
 @tree.command(name = "clear", description = "Clears the current queue", guild = discord.Object(id=536041241972834304))
 async def clear(interaction):
     await interaction.response.defer(ephemeral=False)
-    queuePlaylist.clear()
-    sourcePlaylist.clear()
+    clearQueue()
     await interaction.followup.send(f"Queue was cleared by {interaction.user.mention}")
 
 async def send_message(message, user_message, is_private):
@@ -156,8 +174,7 @@ async def disconnect(interaction):
             if voice.is_connected():
                 await voice.disconnect()
                 await interaction.followup.send(f"Disconnected by {interaction.user.mention}")
-                queuePlaylist.clear()
-                sourcePlaylist.clear()
+                clearQueue()
             else:
                 await interaction.followup.send("Dumb human, I'm not in a voice channel! (But I'll let you off the hook this time)")
             
@@ -212,6 +229,10 @@ async def resume_audio(message):
         voice.is_playing() # Audio is playing again
     except Exception as e:
         print(e)
+
+def clearQueue():
+    queuePlaylist.clear()
+    sourcePlaylist.clear()
 
 def playNext(user_message):
     try:
