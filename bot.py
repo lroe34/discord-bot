@@ -11,6 +11,8 @@ import os
 from bs4 import BeautifulSoup
 #import package to make script wait
 import asyncio
+import requests
+from pytube import Playlist
 
 intents = discord.Intents.default()
 intents.typing = False
@@ -23,6 +25,7 @@ tree = app_commands.CommandTree(client)
 
 queuePlaylist = []
 sourcePlaylist = []
+titlePlaylist = []
 class SimpleView(discord.ui.View):
     @discord.ui.button(label="testtesttesttesttesttesttesttesttesttesttesttesttesttesttest", style=discord.ButtonStyle.secondary, custom_id="test")
     async def hello(self, interaction: discord.Interaction, button: discord.ui.Button, interaction_type: discord.InteractionType):
@@ -52,18 +55,29 @@ def build_button(label):
     label = soup.get_text()
     return SearchItem(label=label, custom_id=id)
 
-#plays a song from youtube link
+# Plays a song from youtube link
 @tree.command(name = "play", description = "Play music from youtube link", guild=discord.Object(id=536041241972834304)) 
 async def play(interaction, link : str):
+    await interaction.response.defer(ephemeral=False)
     if len(queuePlaylist) == 0: # First song in the queue
-        await interaction.response.defer(ephemeral=False)
-        await play_audio(link,interaction)
-        queuePlaylist.append(link)
-        await interaction.followup.send(responses.get_random_quip())
+        if ('&list=' in link): # Inserted url is a youtube playlist 
+            playlist = Playlist(link)
+            for url in playlist:
+                queuePlaylist.append(url)
+            await interaction.followup.send(f"Adding {len(playlist.video_urls)} songs to queue!")
+        else: # Not a youtube playlist
+            queuePlaylist.append(link)
+            await interaction.followup.send(responses.get_random_quip())
+        await play_audio(queuePlaylist[0],interaction)
     else: # There is a song already playing/in queue
-        await interaction.response.defer(ephemeral=False)
-        queuePlaylist.append(link)
-        await interaction.followup.send("Added song to queue!")
+        if ('&list=' in link): # Inserted url is a youtube playlist 
+            playlist = Playlist(link)
+            for url in playlist:
+                queuePlaylist.append(url)
+            await interaction.followup.send(f"Adding {len(playlist.video_urls)} songs to queue!")
+        else: # Not a youtube playlist
+            queuePlaylist.append(link)
+            await interaction.followup.send("Added song to queue!")
 
 # Pause audio that is playing
 # TODO: Find way to determine if audio is still being played. If song is over, don't want to allow user to pause a finished song
@@ -106,12 +120,13 @@ async def queue(interaction):
     if (len(queuePlaylist) == 0): # No songs in queue
         await interaction.followup.send("Queue is empty!")
     else: # Songs in queue
-        await interaction.followup.send("Current queue:")
-        view = ""
+        view = "Current queue: \n"
         queuePos = 1
-        for i in queuePlaylist:
+        for i in titlePlaylist:
             view += str(queuePos) + ": " + i + "\n"
+            print(i)
             queuePos += 1
+        print(view)
         await interaction.followup.send(view)
 
 # Show the current song that is playing
@@ -122,7 +137,7 @@ async def current(interaction):
     if (len(queuePlaylist == 0)):
         await interaction.followup.send(f"There is no song playing!")
     else:
-        await interaction.followup.send(f"Current song that is playing: {queuePlaylist[0]}")
+        await interaction.followup.send(f"Current song that is playing: {titlePlaylist[0]}")
 
 
 @tree.command(name = "clear", description = "Clears the current queue", guild = discord.Object(id=536041241972834304))
@@ -194,9 +209,7 @@ async def play_audio(user_message, message):
         info = ydl.extract_info(user_message, download=True, process=True, ie_key='Youtube')
         URL = info['formats'][0]['url']
 
-    # check if input link is for a playlist or a single video
-        #if '&list=' in user_message:
-
+        # check if input link is for a playlist or a single video
         voice = discord.utils.get(client.voice_clients, guild=message.guild)
         try:
             channel = message.user.voice.channel
@@ -207,6 +220,7 @@ async def play_audio(user_message, message):
             voice = discord.utils.get(client.voice_clients, guild=message.guild)
         source = discord.FFmpegPCMAudio(executable="C:/PATH_Programs/ffmpeg.exe", source="audio.mp3")
         sourcePlaylist.append(source)
+        # titlePlaylist.append(getTitle(user_message))
         voice.play(source, after=audioDone)
         voice.is_playing()
     except Exception as e:
@@ -233,6 +247,7 @@ async def resume_audio(message):
 def clearQueue():
     queuePlaylist.clear()
     sourcePlaylist.clear()
+    titlePlaylist.clear()
 
 def playNext(user_message):
     try:
@@ -253,6 +268,7 @@ def playNext(user_message):
         voice = discord.utils.get(client.voice_clients)
         source = discord.FFmpegPCMAudio(executable="C:/PATH_Programs/ffmpeg.exe", source="audio.mp3")
         sourcePlaylist.append(source)
+        # titlePlaylist.append(getTitle(user_message))
         voice.play(source, after=audioDone)
         voice.is_playing()
     except Exception as e:
@@ -264,9 +280,21 @@ def audioDone(error):
         sourcePlaylist[0].cleanup()
         sourcePlaylist.pop(0) # Remove 0th item from sourcePlaylist
         queuePlaylist.pop(0) # Remove 0th item from queuePlaylist
+        # titlePlaylist.pop()
         playNext(queuePlaylist[0])
     except Exception as e:
         print(e)
+
+# Get the title of the youtube url
+# TODO: Function getting stuck on 'title=...' line
+def getTitle(url):
+    r = requests.get(url)
+    print("Here 1")
+    s = BeautifulSoup(r.text, "html.parser")
+    print("Here 2")
+    title = s.find("span", class_="watch-title").text.replace("\n", "")
+    print("Title: ", title)
+    return title
 
 def run_discord_bot():
 
