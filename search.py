@@ -52,6 +52,18 @@ def youtube_search(options):
 
   return('Videos:\n', '\n'.join(videos), '\n')
 
+def get_youtube_title(url):
+  youtube = build(YOUTUBE_API_SERVICE_NAME, YOUTUBE_API_VERSION,
+    developerKey=DEVELOPER_KEY)
+  vid_id = str(url).split("watch?v=")[1]
+  response = youtube.videos().list(
+        part="snippet,contentDetails,statistics",
+        id=vid_id
+    ).execute()
+  title = response['items'][0]['snippet']['title']
+  return title
+
+
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
