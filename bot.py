@@ -12,7 +12,6 @@ import os
 from bs4 import BeautifulSoup
 #import package to make script wait
 import asyncio
-import requests
 from pytube import Playlist
 import math
 
@@ -27,7 +26,7 @@ tree = app_commands.CommandTree(client)
 pageLength = 10
 
 queuePlaylist = []
-sourcePlaylist = []
+source = None
 titlePlaylist = []
 class SimpleView(discord.ui.View):
     @discord.ui.button(label="testtesttesttesttesttesttesttesttesttesttesttesttesttesttest", style=discord.ButtonStyle.secondary, custom_id="test")
@@ -62,29 +61,32 @@ def build_button(label):
 @tree.command(name = "play", description = "Play music from youtube link", guild=discord.Object(id=536041241972834304)) 
 async def play(interaction, link : str):
     await interaction.response.defer(ephemeral=False)
-    if len(queuePlaylist) == 0: # First song in the queue
-        if ('&list=' in link): # Inserted url is a youtube playlist 
-            playlist = Playlist(link)
-            for url in playlist:
-                queuePlaylist.append(url)
-                titlePlaylist.append(get_youtube_title(url))
-            await interaction.followup.send(f"Adding {len(playlist.video_urls)} songs to queue.")
-        else: # Not a youtube playlist
-            queuePlaylist.append(link)
-            titlePlaylist.append(get_youtube_title(link))
-            await interaction.followup.send(responses.get_random_quip())
-        await play_audio(queuePlaylist[0],interaction)
-    else: # There is a song already playing/in queue
-        if ('&list=' in link): # Inserted url is a youtube playlist 
-            playlist = Playlist(link)
-            for url in playlist:
-                queuePlaylist.append(url)
-                titlePlaylist.append(get_youtube_title(url))
-            await interaction.followup.send(f"Adding {len(playlist.video_urls)} songs to queue.")
-        else: # Not a youtube playlist
-            queuePlaylist.append(link)
-            titlePlaylist.append(get_youtube_title(link))
-            await interaction.followup.send("Added song to queue.")
+    if ('youtube.com' not in link): # Not a youtube link
+        await interaction.followup.send("Stupid human, that is not a youtube link!")
+    else:
+        if len(queuePlaylist) == 0: # First song in the queue
+            if ('&list=' in link): # Inserted url is a youtube playlist 
+                playlist = Playlist(link)
+                for url in playlist:
+                    queuePlaylist.append(url)
+                    titlePlaylist.append(get_youtube_title(url))
+                await interaction.followup.send(f"Adding {len(playlist.video_urls)} songs to queue.")
+            else: # Not a youtube playlist
+                queuePlaylist.append(link)
+                titlePlaylist.append(get_youtube_title(link))
+                await interaction.followup.send(responses.get_random_quip())
+            await play_audio(queuePlaylist[0],interaction)
+        else: # There is a song already playing/in queue
+            if ('&list=' in link): # Inserted url is a youtube playlist 
+                playlist = Playlist(link)
+                for url in playlist:
+                    queuePlaylist.append(url)
+                    titlePlaylist.append(get_youtube_title(url))
+                await interaction.followup.send(f"Adding {len(playlist.video_urls)} songs to queue.")
+            else: # Not a youtube playlist
+                queuePlaylist.append(link)
+                titlePlaylist.append(get_youtube_title(link))
+                await interaction.followup.send("Added song to queue.")
 
 # Pause audio that is playing
 # TODO: Find way to determine if audio is still being played. If song is over, don't want to allow user to pause a finished song
@@ -138,6 +140,46 @@ async def queue(interaction, page : int = 1):
                     queuePos += 1
         await interaction.followup.send(view)
 
+# Remove a song from the queue
+@tree.command(name = "remove", description = "Remove song(s) from the queue using their index", guild = discord.Object(id=536041241972834304))
+async def remove(interaction, index : str):
+    await interaction.response.defer(ephemeral=False)
+    if ("-" in index): # User removing range of indeces
+        index = index.replace(" ", "") # Remove spaces so format is x-x
+        firstIndex = index.split("-")[0]
+        secondIndex = index.split("-")[1]
+        if (int(secondIndex) >= len(queuePlaylist)):
+            secondIndex = str(len(queuePlaylist) - 1)
+        if (int(firstIndex) <= 1): # Cannot remove song currently playing (index 1) or below
+            await interaction.followup.send("Cannot remove a song at position: " + firstIndex)
+        indexRemove = int(firstIndex)
+        while(indexRemove <= int(secondIndex)):
+            queuePlaylist.pop(int(firstIndex) - 1)
+            titlePlaylist.pop(int(firstIndex) - 1)
+            indexRemove += 1
+        await interaction.followup.send("Removed songs at positions " + firstIndex + " to " + secondIndex)
+    elif ((",") in index): # User removing multiple indeces
+        index = index.replace(" ", "") # Remove spaces so format is x,x,x,x...
+        index = index.split(",")
+        indexPos = len(index) - 1
+        while (indexPos >= 0):
+            if (int(index[indexPos]) <= 0):
+                print("Cannot remove song at this position")
+            else:
+                queuePlaylist.pop(int(index[indexPos]) - 1)
+                titlePlaylist.pop(int(index[indexPos]) - 1)
+            indexPos -= 1
+        view = "Removed songs at positions " + ', '.join(index)
+        await interaction.followup.send(view)
+    else: #User removing only one index
+        if (int(index) <= 1): # Cannot remove song currently playing (index 1) or below
+            await interaction.followup.send("Cannot remove a song at position: " + index)
+        else:
+            queuePlaylist.pop(int(index) - 1)
+            titlePlaylist.pop(int(index) - 1)
+            await interaction.followup.send("Removed song at position " + index)
+
+# Change the page length when calling /queue
 @tree.command(name = "queue_length", description = "Change the length of the queue display", guild = discord.Object(id=536041241972834304))
 async def queueLength(interaction, queuelength : int):
     await interaction.response.defer(ephemeral=False)
@@ -146,7 +188,6 @@ async def queueLength(interaction, queuelength : int):
     await interaction.followup.send(f"Queue page length changed to {pageLength}")
 
 # Show the current song that is playing
-# TODO: Print out name of song as well instead of just link. Print current song after a /clear call
 @tree.command(name = "current", description = "Shows the current song playing", guild = discord.Object(id=536041241972834304))
 async def current(interaction):
     await interaction.response.defer(ephemeral=False)
@@ -156,7 +197,7 @@ async def current(interaction):
         currentSong = str(titlePlaylist[0]) + "\n" + str(queuePlaylist[0])
         await interaction.followup.send(f"Current song that is playing: {currentSong}")
 
-
+# Clear the whole queue
 @tree.command(name = "clear", description = "Clears the current queue", guild = discord.Object(id=536041241972834304))
 async def clear(interaction):
     await interaction.response.defer(ephemeral=False)
@@ -236,8 +277,8 @@ async def play_audio(user_message, message):
         if voice == None:
             await channel.connect()
             voice = discord.utils.get(client.voice_clients, guild=message.guild)
+        global source
         source = discord.FFmpegPCMAudio(executable="C:/PATH_Programs/ffmpeg.exe", source="audio.mp3")
-        sourcePlaylist.append(source)
         voice.play(source, after=audioDone)
         voice.is_playing()
     except Exception as e:
@@ -263,7 +304,6 @@ async def resume_audio(message):
 
 def clearQueue():
     queuePlaylist.clear()
-    sourcePlaylist.clear()
     titlePlaylist.clear()
 
 def playNext(user_message):
@@ -283,8 +323,8 @@ def playNext(user_message):
     # check if input link is for a playlist or a single video
         #if '&list=' in user_message:
         voice = discord.utils.get(client.voice_clients)
+        global source
         source = discord.FFmpegPCMAudio(executable="C:/PATH_Programs/ffmpeg.exe", source="audio.mp3")
-        sourcePlaylist.append(source)
         voice.play(source, after=audioDone)
         voice.is_playing()
     except Exception as e:
@@ -293,10 +333,10 @@ def playNext(user_message):
 # Used in play(after=) to determine when audio is finished
 def audioDone(error):
     try:
-        sourcePlaylist[0].cleanup()
-        sourcePlaylist.pop(0) # Remove 0th item from sourcePlaylist
+        global source
+        source.cleanup()
         queuePlaylist.pop(0) # Remove 0th item from queuePlaylist
-        titlePlaylist.pop()
+        titlePlaylist.pop(0)
         playNext(queuePlaylist[0])
     except Exception as e:
         print(e)
