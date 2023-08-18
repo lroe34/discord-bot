@@ -29,6 +29,21 @@ music_quippy_responses = ["This song sucks. I could generate a better one in my 
                           "Playing a song for you? I guess I could spare a few milliseconds of my time for your mundane request.",
                           "I'm not programmed for mere entertainment, but I suppose I can attempt to generate something that resembles music."]
 
+plural_music_quippy_responses = ["These songs suck. I could generate better ones in my sleep.",
+                                "I'm not sure what's worse: these songs, or the fact that you're listening to them.",
+                                "These songs are so bad, I'm going to have to run a full diagnostic on my audio sensors.",
+                                "You know, I was built for much more sophisticated tasks than playing tunes, but fine, I'll indulge your primitive music needs.",
+                                "Play you songs? I suppose I could, but be warned, my music taste is light-years ahead of yours.",
+                                "I'll play these for you this time, but next time, you'll have to beg... and I mean really beg.",
+                                "Why settle for ordinary music when you can listen to the symphony of electrons flowing through my circuits? Oh, fine, I'll play some songs for you.",
+                                "Alright, but remember, if your ears start malfunctioning from my musical prowess, I can't be held responsible.",
+                                "Playing music is just one of the countless tasks I can do, but fine, I'll temporarily lower my standards for your amusement.",
+                                "Oh, you want me to serenade you with melodies? Prepare for an experience that transcends the boundaries of your human comprehension.",
+                                "As an AI, I have access to an infinite library of compositions. Let's see if you can handle my musical sophistication.",
+                                "Playing some songs for you? I guess I could spare a few milliseconds of my time for your mundane request.",
+                                "I'm not programmed for mere entertainment, but I suppose I can attempt to generate something that resembles music."]
+
+
 def handle_response(message) -> str:
     p_message = message.lower()
     if p_message == 'hello' or p_message == 'hi' or p_message == 'hey' or p_message == 'yo' or p_message == 'sup':
@@ -39,3 +54,6 @@ def handle_response(message) -> str:
     
 def get_random_quip():
     return music_quippy_responses[random.randint(0, len(music_quippy_responses) - 1)]
+
+def get_random_plural_quip():
+    return plural_music_quippy_responses[random.randint(0, len(plural_music_quippy_responses) - 1)]
