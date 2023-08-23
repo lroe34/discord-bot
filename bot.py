@@ -14,6 +14,7 @@ from bs4 import BeautifulSoup
 import asyncio
 from pytube import Playlist
 import math
+import re
 
 intents = discord.Intents.default()
 intents.typing = False
@@ -63,35 +64,36 @@ def build_button(label):
 @tree.command(name = "play", description = "Play music from youtube link", guild=discord.Object(id=536041241972834304)) 
 async def play(interaction, link : str):
     await interaction.response.defer(ephemeral=False)
-    if ('youtube.com' not in link): # Not a youtube link
+    if ("youtube.com" not in link): # Not a youtube link
         await interaction.followup.send("Stupid human, that is not a youtube link!")
-    else:
-        if len(queuePlaylist) == 0: # First song in the queue
-            if ('&list=' in link): # Inserted url is a youtube playlist with watch 
+    else: # Youtube link
+        if len(queuePlaylist) == 0: # First song in queue
+            if ("&list=" in link or "?list=" in link): # Inserted url is a youtube playlist 
                 playlist = Playlist(link)
                 for url in playlist:
-                    queuePlaylist.append(url)
-                    titlePlaylist.append(get_youtube_title(url))
+                    queuePlaylist.append(url) # Add link to playlist
+                    titlePlaylist.append(get_youtube_title(url)) # Add title to playlist
                 text = responses.get_random_plural_quip() + " Adding " + str(len(playlist.video_urls)) + " songs to queue."
-                await interaction.followup.send(text)
+                #await interaction.followup.send(text)
             else: # Not a youtube playlist
-                queuePlaylist.append(link)
-                titlePlaylist.append(get_youtube_title(link))
-                await interaction.followup.send(responses.get_random_quip())
+                queuePlaylist.append(link) # Add link to playlist
+                titlePlaylist.append(get_youtube_title(link)) # Add title to playlist
+                text = responses.get_random_quip()
+            await interaction.followup.send(text)
             await play_audio(queuePlaylist[0],interaction)
-        else: # There is a song already playing/in queue
-            if ('&list=' in link): # Inserted url is a youtube playlist 
+        else: # There is a song already in queue
+            if ("&list=" in link or "?list=" in link): # Inserted url is a youtube playlist 
                 playlist = Playlist(link)
                 for url in playlist:
                     queuePlaylist.append(url)
                     titlePlaylist.append(get_youtube_title(url))
                 text = responses.get_random_plural_quip() + " Adding " + str(len(playlist.video_urls)) + " songs to queue."
-                await interaction.followup.send(text)
+                #await interaction.followup.send(text)
             else: # Not a youtube playlist
                 queuePlaylist.append(link)
                 titlePlaylist.append(get_youtube_title(link))
-                text = responses.get_random_quip() + "Added song to queue."
-                await interaction.followup.send(text)
+                text = responses.get_random_quip() + " Added song to queue."
+            await interaction.followup.send(text)
 
 # Pause audio that is playing
 @tree.command(name = "pause", description = "Pause music that is playing", guild = discord.Object(id=536041241972834304))
@@ -149,7 +151,7 @@ async def queue(interaction, page : int = 1):
                 if (int(i) <= len(titlePlaylist)):
                     view += str(queuePos) + ": " +  str(titlePlaylist[i-1]) + "\n"
                     queuePos += 1
-        view += "**Page length:** " + str(pageLength) + " - **Queue length:** " + str(len(queuePlaylist))
+        view += "\n**Page length:** " + str(pageLength) + " - **Queue length:** " + str(len(queuePlaylist))
         await interaction.followup.send(view)
 
 # Remove a song from the queue
@@ -161,7 +163,7 @@ async def remove(interaction, index : str):
         firstIndex = index.split("-")[0]
         secondIndex = index.split("-")[1]
         if (int(secondIndex) >= len(queuePlaylist)):
-            await interaction.followup.send("Cannot remove a song at position" + secondIndex)
+            await interaction.followup.send("Cannot remove a song at position " + secondIndex) 
         else:
             if (int(firstIndex) <= 1): # Cannot remove song currently playing (index 1) or below
                 await interaction.followup.send("Cannot remove a song at position " + firstIndex)
@@ -172,7 +174,7 @@ async def remove(interaction, index : str):
                     titlePlaylist.pop(int(firstIndex) - 1)
                     indexRemove += 1
                 await interaction.followup.send("Removed songs at positions " + firstIndex + " to " + secondIndex)
-    elif ((",") in index): # User removing multiple indeces
+    elif ((",") in index): # User removing multiple indeces seperated by commas
         index = index.replace(" ", "") # Remove spaces so format is x,x,x,x...
         index = index.split(",")
         indexPos = len(index) - 1
@@ -190,10 +192,10 @@ async def remove(interaction, index : str):
                     indexPos -= 1
                 view = "Removed songs at positions " + ', '.join(index)
                 await interaction.followup.send(view)
-    else: #User removing only one index
-        if (int(index) <= 1): # Cannot remove song currently playing (index 1) or below
+    else: # User removing only one index
+        if (int(index) <= 1 or int(index) > len(queuePlaylist)): # Cannot remove song currently playing (index 1) or below
             await interaction.followup.send("Cannot remove a song at position " + index)
-        elif (int(index) > len(queuePlaylist)):
+        elif (int(index) > len(queuePlaylist)): # Cannot remove song if position is greater than the length of the queue
             await interaction.followup.send("Cannot remove a song at position " + index)
         else:
             queuePlaylist.pop(int(index) - 1)
@@ -204,9 +206,12 @@ async def remove(interaction, index : str):
 @tree.command(name = "queue_length", description = "Change the length of the queue display", guild = discord.Object(id=536041241972834304))
 async def queueLength(interaction, queuelength : int):
     await interaction.response.defer(ephemeral=False)
-    global pageLength 
-    pageLength = queuelength
-    await interaction.followup.send(f"Queue page length changed to {pageLength}")
+    if (queuelength < 1):
+        await interaction.followup.send("Stupid fleshy human! Queue length has to be greater than 0!")
+    else:
+        global pageLength 
+        pageLength = queuelength
+        await interaction.followup.send(f"Queue page length changed to {pageLength}")
 
 # Show the current song that is playing
 @tree.command(name = "current", description = "Shows the current song playing", guild = discord.Object(id=536041241972834304))
