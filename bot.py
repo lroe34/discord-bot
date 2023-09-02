@@ -1,5 +1,5 @@
 import discord
-from discord import app_commands
+from discord import app_commands, Color
 from discord.ext import commands
 import responses
 import nacl
@@ -28,7 +28,6 @@ tree = app_commands.CommandTree(client)
 queuePlaylist = [] # Queue of links
 source = None      # Used to properly skip a song
 titlePlaylist = [] # Queue of titles 
-isSong = False     # Used to see if there is a song currently
 pageLength = 10    # Page length of the queue display
 
 class SimpleView(discord.ui.View):
@@ -42,11 +41,17 @@ class SearchItem(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=False)
-        await play_audio(f'https://www.youtube.com/watch?v={self.custom_id}',interaction)
-        await interaction.edit_original_response(view=None, content=f"Played {self.label}")
+        if (len(queuePlaylist) == 0):
+            queuePlaylist.append(f'https://www.youtube.com/watch?v={self.custom_id}')
+            titlePlaylist.append(get_youtube_title(f'https://www.youtube.com/watch?v={self.custom_id}'))
+            await play_audio(f'https://www.youtube.com/watch?v={self.custom_id}',interaction)
+            await interaction.edit_original_response(view=None, content=f"Played {self.label}")
+        else:
+            queuePlaylist.append(f'https://www.youtube.com/watch?v={self.custom_id}')
+            titlePlaylist.append(get_youtube_title(f'https://www.youtube.com/watch?v={self.custom_id}'))
+            text = "Added " + str(self.label) + " to queue"
+            await interaction.edit_original_response(view=None, content=f"Added {self.label} to queue")
         
-
-
 def build_button(label):
     label = label.split(' (')
     id = label[-1]
@@ -59,6 +64,8 @@ def build_button(label):
     soup = BeautifulSoup(label, 'html.parser')
     label = soup.get_text()
     return SearchItem(label=label, custom_id=id)
+
+# <----- Commands ------>
 
 # Plays a song from youtube link
 @tree.command(name = "play", description = "Play music from youtube link", guild=discord.Object(id=536041241972834304)) 
@@ -98,27 +105,26 @@ async def play(interaction, link : str):
 async def pause(interaction):
     await interaction.response.defer(ephemeral=False)
     voice = discord.utils.get(client.voice_clients, guild=interaction.guild)
-    if (not isSong):          # There is no song playing
+    if (not voice.is_playing() and not voice.is_paused()): # There is no song
         await interaction.followup.send("Cannot pause song if there is none!")
-    else:                     # Song playing
-        if voice.is_paused(): # Audio is paused, cannot pause again
+    else:                                                  # Song playing
+        if voice.is_paused():                              # Audio is paused, cannot pause again
             await interaction.followup.send("You cannot pause music that is already paused!")
-        else:                 # Audio is playing, pausing
+        else:                                              # Audio is playing, pausing
             await pause_audio(interaction)
-            await interaction.followup.send(f"Music paused by {interaction.user.mention}")\
-
-
+            await interaction.followup.send(f"Music paused by {interaction.user.mention}")
+            
 # Resume audio that is paused
 @tree.command(name = "resume", description = "Resume music that is paused", guild = discord.Object(id=536041241972834304))
 async def resume(interaction):
     await interaction.response.defer(ephemeral=False)
     voice = discord.utils.get(client.voice_clients, guild=interaction.guild)
-    if (not isSong):           # There is no song playing
+    if (not voice.is_playing() and not voice.is_paused()): # There is no song
         await interaction.followup.send("Cannot resume a song if there isn't one!")
-    else:                      # Song playing
-        if voice.is_playing(): # Audio is playing, cannot resume again
+    else:                                                  # Song playing
+        if voice.is_playing():                             # Audio is playing, cannot resume again
             await interaction.followup.send("You cannot resume music that is already playing!")
-        else:                  # Audio is paused, resuming
+        else:                                              # Audio is paused, resuming
             await resume_audio(interaction)
             await interaction.followup.send(f"Music resumed by {interaction.user.mention}")
 
@@ -127,11 +133,11 @@ async def resume(interaction):
 async def skip(interaction):
     await interaction.response.defer(ephemeral=False)
     voice = discord.utils.get(client.voice_clients, guild=interaction.guild)
-    if (not isSong): # There is no song playing
+    if (not voice.is_playing() and not voice.is_paused()): # There is no song 
         await interaction.followup.send("Cannot skip a song if there is none!")
-    else:            # Song playing
+    else:                                                  # Song playing
         await interaction.followup.send(f"Song skipped by {interaction.user.mention}")
-        voice.stop() # Skip song
+        voice.stop()                                       # Skip song
 
 # Show the current queue
 @tree.command(name = "queue", description = "Shows the current song queue", guild = discord.Object(id=536041241972834304))
@@ -150,7 +156,7 @@ async def queue(interaction, page : int = 1):
                 if (int(i) <= len(titlePlaylist)):
                     view += str(queuePos) + ": " +  str(titlePlaylist[i-1]) + "\n"
                     queuePos += 1
-        view += "\n**Page length:** " + str(pageLength) + " - **Queue length:** " + str(len(queuePlaylist))
+        view += "\n** Queue length: **" + str(len(queuePlaylist)) + " - **Page length: " + str(pageLength)
         await interaction.followup.send(view)
 
 # Remove a song from the queue
@@ -163,7 +169,7 @@ async def remove(interaction, index : str):
         secondIndex = index.split("-")[1]                           # Number after dash
         if (not firstIndex.isdigit() or not secondIndex.isdigit()): # 1st or 2nd input is not a digit
             await interaction.followup.send("Input for positions must be digits!") 
-        if (int(secondIndex) >= len(queuePlaylist)):                # 2nd number is out of index range
+        elif (int(secondIndex) > len(queuePlaylist)):               # 2nd number is out of index range
             await interaction.followup.send("Cannot remove a song at position " + secondIndex) 
         else:
             if (int(firstIndex) <= 1):                              # Cannot remove song currently playing (index 1) or below
@@ -203,8 +209,12 @@ async def current(interaction):
     if (len(queuePlaylist) == 0):                                          # There is no song playing
         await interaction.followup.send(f"There is no song playing!")
     else:                                                                  # There is a song playing
-        currentSong = str(titlePlaylist[0]) + "\n" + str(queuePlaylist[0]) # Print the song title and youtube link
-        await interaction.followup.send(f"Current song that is playing: {currentSong}")
+        masked_link_embed = discord.Embed(
+            title = titlePlaylist[0],
+            description = str(queuePlaylist[0]),
+        )
+        currentSong = str(titlePlaylist[0]) + "\n" # Print the song title and youtube link
+        await interaction.followup.send(embed=masked_link_embed)
 
 # Clear the whole queue
 @tree.command(name = "clear", description = "Clears the current queue", guild = discord.Object(id=536041241972834304))
@@ -216,13 +226,7 @@ async def clear(interaction):
         clearQueue()                  # Clear the queue
         await interaction.followup.send(f"Queue was cleared by {interaction.user.mention}")
 
-async def send_message(message, user_message, is_private):
-    try:
-        response = responses.handle_response(user_message)
-        await message.author.send(response) if is_private else await message.channel.send(response)
-    except Exception as e:
-        print(e)
-
+# The viking funeral for a user
 @tree.command(name = "viking_funeral", description = "Send a member a proper fairwell", guild=discord.Object(id=536041241972834304)) 
 async def vikingFuneral(interaction, member : discord.Member):
     await interaction.response.defer(ephemeral=False)
@@ -232,7 +236,7 @@ async def vikingFuneral(interaction, member : discord.Member):
     await asyncio.sleep(156)
     await member.kick()
 
-
+# Search for a song on youtube
 @tree.command(name = "search", description = "Search for a song on YouTube", guild=discord.Object(id=536041241972834304)) 
 async def search(interaction, search : str):
     parser = argparse.ArgumentParser()
@@ -247,14 +251,10 @@ async def search(interaction, search : str):
         view.add_item(build_button(video))
     await interaction.response.send_message(view=view, content='**Here\'s what I found**')
 
-   
+# Pick a song after searching
 @tree.command(name = 'pick', description = "Pick video from search list", guild=discord.Object(id=536041241972834304))
 async def pick(interaction, pick : str):
-    if (len(queuePlaylist) == 0): # There is no song in queue
-        await play_audio(interaction, f'https://www.youtube.com/watch?v={pick}', False)
-    else:                         # There are song(s) in queue
-        queuePlaylist.append(f"https://www.youtube.com/watch?v={pick}")                     # Add link to queue
-        titlePlaylist.append(get_youtube_title(f"https://www.youtube.com/watch?v={pick}"))  # Add title to queue
+    await play_audio(interaction, f'https://www.youtube.com/watch?v={pick}', False)
 
 # Disconnect bot from voice channel
 @tree.command(name = 'disconnect', description = "Kick V.H.O.S from their current channel", guild=discord.Object(id=536041241972834304))
@@ -262,14 +262,37 @@ async def disconnect(interaction):
     await interaction.response.defer(ephemeral=False)
     voice = discord.utils.get(client.voice_clients, guild=interaction.guild)
     if voice.is_connected():     # Bot is in voice channel
-        await voice.disconnect() # Disconnect the bot
         await interaction.followup.send(f"Disconnected by {interaction.user.mention}")
-        global isSong
-        isSong = False           # There is no song available
         clearQueue()             # Clear the queue
+        await voice.disconnect() # Disconnect the bot
     else:                        # Bot is no in voice channel
         await interaction.followup.send("Dumb human, I'm not in a voice channel! (But I'll let you off the hook this time)")
-            
+        
+# <----- End of Commands ------>
+
+# Wait and disconnect the bot after minutesInactive minutes
+@client.event
+async def on_voice_state_update(self, before, interaction):
+    minutesInactive = 5                                 # The amount of minutes it takes for the bot to disconnect after inactivity
+    if before.channel is None:
+        voice = interaction.channel.guild.voice_client
+        time = 0
+        while True:
+            await asyncio.sleep(1)                      # Wait one second
+            time += 1
+            if voice.is_playing() or voice.is_paused(): # If the bot is playing or paused
+                time = 0
+            if time == minutesInactive * 60:            # If the amount of minutes is reached (in seconds)
+                await voice.disconnect()                # Disconnect the bot
+            if not voice.is_connected():
+                break
+
+async def send_message(message, user_message, is_private):
+    try:
+        response = responses.handle_response(user_message)
+        await message.author.send(response) if is_private else await message.channel.send(response)
+    except Exception as e:
+        print(e)
 
 # asnyc function to have the bot join voice channel and play audio from youtube
 async def play_audio(user_message, message):
@@ -298,8 +321,6 @@ async def play_audio(user_message, message):
             voice = discord.utils.get(client.voice_clients, guild=message.guild)
         global source
         source = discord.FFmpegPCMAudio(executable="C:/PATH_Programs/ffmpeg.exe", source="audio.mp3")
-        global isSong
-        isSong = True                       # There is a song available
         voice.play(source, after=audioDone) # Play the song
         voice.is_playing()                  # Song is playing
     except Exception as e:
@@ -346,8 +367,6 @@ def playNext(user_message):
         voice = discord.utils.get(client.voice_clients)
         global source
         source = discord.FFmpegPCMAudio(executable="C:/PATH_Programs/ffmpeg.exe", source="audio.mp3")
-        global isSong 
-        isSong = True                       # There is a song available
         voice.play(source, after=audioDone) # Play the song
         voice.is_playing()                  # Song is playing
     except Exception as e:
@@ -357,8 +376,6 @@ def playNext(user_message):
 def audioDone(error):
     try:
         global source
-        global isSong
-        isSong = False             # There is no longer a song available
         source.cleanup()           # Cleanup the source to skip properly
         queuePlaylist.pop(0)       # Remove 0th item from link queue
         titlePlaylist.pop(0)       # Remove 0th item from title queue
@@ -372,7 +389,6 @@ def run_discord_bot():
     async def on_ready():
         print(f'{client.user} is now running!')
         await tree.sync(guild=discord.Object(id=536041241972834304))
-        
         await client.change_presence(activity=discord.Streaming(name='your data off-planet', url='https://www.youtube.com/watch?v=dQw4w9WgXcQ'))
         print("Ready!")
 
@@ -398,5 +414,4 @@ def run_discord_bot():
         await play_audio(f'https://www.youtube.com/watch?v={interaction.component.custom_id}',interaction)
         await interaction.followup.send(responses.get_random_quip())
     
-
     client.run(TOKEN)
