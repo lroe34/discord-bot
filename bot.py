@@ -16,6 +16,13 @@ import math
 import threading
 import random
 
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+TOKEN = os.getenv("API_KEY")
+
 intents = discord.Intents.default()
 intents.typing = False
 intents.presences = False
