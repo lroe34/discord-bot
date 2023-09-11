@@ -15,12 +15,16 @@ import asyncio
 from pytube import Playlist
 import math
 import re
+from dotenv import load_dotenv
+
+load_dotenv()
+
+TOKEN = os.getenv("API_KEY")
 
 intents = discord.Intents.default()
 intents.typing = False
 intents.presences = False
 intents.message_content = True
-TOKEN = 'MTEzMTU1OTU3OTQ5NTQ0ODU5Ng.GRrkOF.9XxYeknyj7SVcsQqX2AD2k-5CAIFewCzsZ9a6k'
 
 client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
