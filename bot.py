@@ -18,6 +18,9 @@ import random
 import sys
 import os
 from discord.ext import commands
+import sys
+import os
+from discord.ext import commands
 
 from dotenv import load_dotenv
 import os
@@ -410,7 +413,7 @@ async def disconnect(interaction):
         await interaction.followup.send("Dumb human, I'm not in a voice channel! (But I'll let you off the hook this time)")
 
 @tree.command(name="kill", description="Kill V.H.O.S", guild=discord.Object(id=536041241972834304))
-async def kill(ctx):
+async def kill():
     exit()
 # @tree.command(name = 'restart', description = "Restart V.H.O.S if it is stuck.", guild=discord.Object(id=536041241972834304))
 # async def restart(ctx):
