@@ -15,6 +15,9 @@ from pytube import Playlist
 import math
 import threading
 import random
+import sys
+import os
+from discord.ext import commands
 
 from dotenv import load_dotenv
 import os
@@ -200,29 +203,27 @@ async def remove(interaction, index : str):
             titlePlaylist.pop(int(index) - 1)
             await interaction.followup.send("Removed song at position " + index)
 
-# Insert url next in queue
-@tree.command(name = "next", description = "Put song into the next position of the queue", guild = discord.Object(id=536041241972834304))
-async def next(interaction, link : str):
-    await interaction.response.defer(ephemeral=False)
-    if ("youtube.com" not in link):                                        # Not a youtube link
-        await interaction.followup.send("Stupid human, that is not a youtube link!")
-    else: # Youtube link
-        t1 = threading.Thread(target=addTitle, args=(link,))
-        t1.start()
-        if len(queuePlaylist) == 0:                                        # There is no current song
-            await interaction.followup.send("Idiot! Can't put anything next if there is nothing playing!")
-        else:                                                              # There is a song already in queue
-            if ("&list=" in link or "?list=" in link):                     # Inserted url is a youtube playlist 
-                playlist = Playlist(link)
-                position = 1
-                for url in playlist:
-                    queuePlaylist.insert(position, url)                    # Add link to queue
-                    position += 1
-                text = responses.get_random_plural_quip() + " Adding " + str(len(playlist.video_urls)) + " songs to queue."
-            else:                                                          # Not a youtube playlist
-                queuePlaylist.insert(1, link)                              # Add link to queue
-                text = responses.get_random_quip() + " Added song to queue."
-            await interaction.followup.send(text)
+# # Insert url next in queue
+# @tree.command(name = "next", description = "Put song into the next position of the queue", guild = discord.Object(id=536041241972834304))
+# async def next(interaction, link : str):
+#     await interaction.response.defer(ephemeral=False)
+#     if ("youtube.com" not in link):                                        # Not a youtube link
+#         await interaction.followup.send("Stupid human, that is not a youtube link!")
+#     else: # Youtube link
+#         if len(queuePlaylist) == 0:                                        # There is no current song
+#             await interaction.followup.send("Idiot! Can't put anything next if there is nothing playing!")
+#         else:                                                              # There is a song already in queue
+#             if ("&list=" in link or "?list=" in link):                     # Inserted url is a youtube playlist 
+#                 playlist = Playlist(link)
+#                 position = 1
+#                 for url in playlist:
+#                     queuePlaylist.insert(position, url)                    # Add link to queue
+#                     position += 1
+#                 text = responses.get_random_plural_quip() + " Adding " + str(len(playlist.video_urls)) + " songs to queue."
+#             else:                                                          # Not a youtube playlist
+#                 queuePlaylist.insert(1, link)                              # Add link to queue
+#                 text = responses.get_random_quip() + " Added song to queue."
+#             await interaction.followup.send(text)
 
 # Replay the current song
 @tree.command(name = "replay", description = "Replay the current song next", guild =discord.Object(id=536041241972834304))
@@ -407,6 +408,14 @@ async def disconnect(interaction):
         await voice.disconnect() # Disconnect the bot
     else:                        # Bot is no in voice channel
         await interaction.followup.send("Dumb human, I'm not in a voice channel! (But I'll let you off the hook this time)")
+
+@tree.command(name="kill", description="Kill V.H.O.S", guild=discord.Object(id=536041241972834304))
+async def kill():
+    exit()
+# @tree.command(name = 'restart', description = "Restart V.H.O.S if it is stuck.", guild=discord.Object(id=536041241972834304))
+# async def restart(ctx):
+#     await ctx.send("Restarting bot...")
+#     os.execv(sys.executable, ['python'] + sys.argv)
         
 # <----- End of Commands ------>
 
